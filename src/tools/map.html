@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Legends of Valour - Map</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville&display=swap" rel="stylesheet">
+    <style>
+      html,
+      body {
+        font-family: 'Libre Baskerville', serif;
+        margin: 0;
+        padding: 0;
+        display: grid;
+        background-color: #000;
+        color: #fff;
+      }
+
+      html,
+      body,
+      canvas {
+        width: 100%;
+        height: 100%;
+      }
+
+      canvas {
+        image-rendering: pixelated;
+      }
+
+      form {
+        position: fixed;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        text-shadow: 2px 2px 0px #000;
+        background-color: rgba(0,0,0,0.5);
+        padding: 1rem;
+      }
+
+      .form-group {
+        display: flex;
+        justify-content: space-between;
+        gap: 1rem;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas>
+      <!-- Mapa -->
+    </canvas>
+    <form>
+      <h1>Mittledorf</h1>
+      <div class="form-group">
+        <label for="map">Mapa</label>
+        <select id="map">
+          <option>Subterráneos</option>
+          <option selected>Planta baja</option>
+          <option>Primera planta</option>
+          <option>Planta baja (Demo)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="zoom">Zoom</label>
+        <input id="zoom" type="range" max="10" min="0.5" step="0.01">
+        <input id="zoom-number" type="text" readonly>
+      </div>
+      <div class="form-group">
+        <label for="tile">Casilla</label>
+        <input id="tile" type="text" readonly>
+      </div>
+      <div class="form-group">
+        <label for="first-byte">Primer byte</label>
+        <input id="first-byte" type="number" readonly>
+      </div>
+      <div class="form-group">
+        <label for="second-byte">Segundo byte</label>
+        <input id="second-byte" type="number" readonly>
+      </div>
+      <div class="form-group">
+        <label for="third-byte">Tercer byte</label>
+        <input id="third-byte" type="number" readonly>
+      </div>
+      <div class="form-group">
+        <label for="inside">Textura interior</label>
+        <input id="inside" type="number" readonly>
+      </div>
+      <div class="form-group">
+        <label for="outside">Textura exterior</label>
+        <input id="outside" type="number" readonly>
+      </div>
+      <div class="form-group">
+        <label for="sprite">Sprite</label>
+        <input id="sprite" type="number" readonly>
+      </div>
+      <div class="form-group">
+        <input id="second-floor" type="checkbox" readonly>
+        <label for="second-floor">Segunda altura</label>
+      </div>
+      <div class="form-group">
+        <input type="checkbox" id="type" checked>
+        <label for="type">Dibujar tipo de casilla</label>
+      </div>
+      <div class="form-group">
+        <input type="checkbox" id="walls" checked>
+        <label for="walls">Dibujar paredes</label>
+      </div>
+      <div class="form-group">
+        <input type="checkbox" id="player" checked>
+        <label for="player">Dibujar jugador</label>
+      </div>
+      <div class="form-group">
+        <input type="checkbox" id="sprites" checked>
+        <label for="sprites">Dibujar sprites</label>
+      </div>
+      <div class="form-group">
+        <input type="checkbox" id="unknown" checked>
+        <label for="unknown">Dibujar desconocidos</label>
+      </div>
+    </form>
+    <script type="module">
+      const tileReadonly = document.getElementById('tile')
+      const firstByteReadonly = document.getElementById('first-byte')
+      const secondByteReadonly = document.getElementById('second-byte')
+      const thirdByteReadonly = document.getElementById('third-byte')
+      const secondFloorReadonly = document.getElementById('second-floor')
+      const insideReadonly = document.getElementById('inside')
+      const outsideReadonly = document.getElementById('outside')
+      const spriteReadonly = document.getElementById('sprite')
+
+      const zoomRange = document.getElementById('zoom')
+      const zoomNumber = document.getElementById('zoom-number')
+      const wallsCheckbox = document.getElementById('walls')
+      const typeCheckbox = document.getElementById('type')
+      const unknownCheckbox = document.getElementById('unknown')
+      const spritesCheckbox = document.getElementById('sprites')
+      const playerCheckbox = document.getElementById('player')
+      const mapSelect = document.getElementById('map')
+
+      const canvas = document.querySelector('canvas')
+      const context = canvas.getContext('2d')
+
+      const MAP_WIDTH = 85
+      const MAP_HEIGHT = 128
+      const MAP_STRIDE = 256
+      const MAP_SIZE = MAP_WIDTH * MAP_HEIGHT
+      const MAP_BYTE_SIZE = MAP_SIZE * 3
+
+      const TILE_SIZE = 16
+      const WALL_SIZE = 1
+
+      const keys = new Map()
+      const map = new Uint8Array(MAP_STRIDE * MAP_HEIGHT)
+
+      const mapMaxZoom = 10
+      const mapMinZoom = 0.5
+
+      let playerX = 82, playerY = 56
+      let mapX = 0, mapY = 0, mapZoom = 1
+      let velX = 0, velY = 0
+      let pointerX = 0, pointerY = 0
+      let tileX = 0, tileY = 0, tileOffset = 0
+      let needsRender = true
+
+      let frameId
+
+      function getTypeColor(type) {
+        switch (type) {
+          case 0: return '#777'
+          case 1: return '#070'
+          case 2: return '#700'
+          case 3: return '#707'
+        }
+      }
+
+      async function loadMap(url) {
+        const response = await fetch(url)
+        const arrayBuffer = await response.arrayBuffer()
+        return new Uint8Array(arrayBuffer)
+      }
+
+      function loadGroundFloorDemo() {
+        return loadMap('MAPG0008.DAT')
+      }
+
+      function loadGroundFloor() {
+        return loadMap('MAPG0009.DAT')
+      }
+
+      function loadUnderground() {
+        return loadMap('MAPU0009.DAT')
+      }
+
+      function loadFirstFloor() {
+        return loadMap('MAPF0009.DAT')
+      }
+
+      function resizeTo(canvas, width, height) {
+        let resized = false
+        if (canvas.width !== width) {
+          canvas.width = width
+          resized = true
+        }
+        if (canvas.height !== height) {
+          canvas.height = height
+          resized = true
+        }
+        return resized
+      }
+
+      function resizeScaled(canvas, multiplier = 1.0) {
+        return resizeTo(canvas, Math.floor(canvas.clientWidth * multiplier), Math.floor(canvas.clientHeight * multiplier))
+      }
+
+      function resize() {
+        resizeScaled(canvas)
+      }
+
+      function input() {
+        if (keys.get('ArrowLeft') || keys.get('KeyA')) {
+          velX += 1
+        } else if (keys.get('ArrowRight') || keys.get('KeyD')) {
+          velX -= 1
+        }
+
+        if (keys.get('ArrowUp') || keys.get('KeyW')) {
+          velY += 1
+        } else if (keys.get('ArrowDown') || keys.get('KeyS')) {
+          velY -= 1
+        }
+      }
+
+      function update() {
+        mapX += Math.round(velX / mapZoom)
+        mapY += Math.round(velY / mapZoom)
+
+        tileX = Math.floor((pointerX - mapX * mapZoom - context.canvas.width / 2) / TILE_SIZE / mapZoom)
+        tileY = Math.floor((pointerY - mapY * mapZoom - context.canvas.height / 2) / TILE_SIZE / mapZoom)
+        tileOffset = tileY * MAP_STRIDE + tileX
+
+        velX *= 0.9
+        velY *= 0.9
+
+        if (velX < 0.01 && velX > -0.01) {
+          velX = 0
+        }
+        if (velY < 0.01 && velY > -0.01) {
+          velY = 0
+        }
+
+        if (velX != 0 || velY != 0) {
+          needsRender = true
+        }
+      }
+
+      function render() {
+        if (!needsRender) {
+          return
+        }
+
+        context.clearRect(0, 0, context.canvas.width, context.canvas.height)
+        context.save()
+        context.translate(context.canvas.width / 2, context.canvas.height / 2)
+        context.scale(mapZoom, mapZoom)
+        context.translate(mapX, mapY)
+        context.font = '16px monospace'
+        context.textBaseline = 'top'
+        context.textAlign = 'left'
+        for (let y = 0; y < MAP_HEIGHT; ++y) {
+          const base = (y * MAP_STRIDE)
+          for (let x = 0; x < MAP_WIDTH; ++x) {
+            const offset = base + x
+            const offsetO = offset
+            const offsetT = offset + MAP_WIDTH
+            const offsetB = offset + MAP_WIDTH + MAP_WIDTH
+            const o = map[offsetO]
+            const t = map[offsetT]
+            const b = map[offsetB]
+
+            // paredes y sprites.
+            // bits:
+            // 7 6 5 4 3 2 1 0
+            // | | | | | | | |
+            // | | | | | | | +-- x = type
+            // | | | | | | +---- x = type
+            // | | | | | +------ x = sprite id
+            // | | | | +-------- x = sprite id
+            // | | | +---------- x = sprite id
+            // | | +------------ 0 = no north wall, 1 = north wall
+            // | +-------------- 0 = no west wall, 1 = west wall
+            // +---------------- x = unknown
+            const type = (o >> 0) & 0x03
+            const hasSprite = (o >> 2) & 0x07
+            const hasNorthWall = (o >> 5) & 0x01
+            const hasWestWall = (o >> 6) & 0x01
+            const unknown = (o >> 7) & 0x01
+
+            // textura interior y exterior.
+            const insideTexture = ((t >> 4) & 0x0F)
+            const outsideTexture = t & 0x0F
+
+            // segundo piso.
+            const hasSecondFloor = (b & 0x01) || (b & 0x02)
+            const unknown2 = (b & 0x3F) >> 2
+
+            if (typeCheckbox.checked) {
+              context.fillStyle = getTypeColor(type)
+              context.fillRect(x * TILE_SIZE + 2, y * TILE_SIZE + 2, TILE_SIZE - 4, TILE_SIZE - 4)
+            }
+
+            context.fillStyle = '#fff'
+            if (hasSprite && spritesCheckbox.checked) {
+              context.fillRect(x * TILE_SIZE + 4, y * TILE_SIZE + 4, TILE_SIZE - 8, TILE_SIZE - 8)
+            }
+
+            if (wallsCheckbox.checked) {
+              context.fillStyle = hasSecondFloor ? '#fff' : '#aaa'
+              if (hasNorthWall) {
+                context.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, WALL_SIZE)
+              }
+
+              if (hasWestWall) {
+                context.fillRect(x * TILE_SIZE, y * TILE_SIZE, WALL_SIZE, TILE_SIZE)
+              }
+            }
+
+            if (unknown && unknownCheckbox.checked) {
+              context.fillStyle = '#0ff'
+              context.fillRect(x * TILE_SIZE + 2, y * TILE_SIZE + 2, TILE_SIZE - 4, TILE_SIZE - 4)
+            }
+          }
+        }
+
+        if (tileX >= 0 && tileX < MAP_WIDTH && tileY >= 0 && tileY < MAP_HEIGHT) {
+          context.fillStyle = '#ff07'
+          context.fillRect(tileX * TILE_SIZE, tileY * TILE_SIZE, TILE_SIZE, TILE_SIZE)
+        }
+
+        if (playerCheckbox.checked) {
+          context.fillStyle = '#f0f'
+          context.fillRect(playerX * TILE_SIZE + 2, playerY * TILE_SIZE + 2, TILE_SIZE - 4, TILE_SIZE - 4)
+        }
+
+        context.restore()
+        needsRender = false
+      }
+
+      function onFrame(currentTime) {
+        resize()
+        input()
+        update()
+        render()
+        frameId = window.requestAnimationFrame(onFrame)
+      }
+
+      function onKey(e) {
+        keys.set(e.code, e.type === 'keydown')
+        if (e.type === 'keyup') {
+          if (e.code === 'KeyR') {
+            mapZoom = 1
+            zoomRange.value = mapZoom
+            zoomNumber.value = `${Math.floor(mapZoom * 100)}%`
+            needsRender = true
+          }
+        }
+      }
+
+      function onPointerMove(e) {
+        pointerX = e.clientX
+        pointerY = e.clientY
+
+        tileX = Math.floor((pointerX - mapX * mapZoom - context.canvas.width / 2) / TILE_SIZE / mapZoom)
+        tileY = Math.floor((pointerY - mapY * mapZoom - context.canvas.height / 2) / TILE_SIZE / mapZoom)
+        tileOffset = tileY * MAP_STRIDE + tileX
+        needsRender = true
+
+        tileReadonly.value = `${tileX}:${tileY}`
+        insideReadonly.value = (map[tileOffset + MAP_WIDTH] & 0x0F)
+        outsideReadonly.value = ((map[tileOffset + MAP_WIDTH] & 0xF0) >> 4)
+        spriteReadonly.value = ((map[tileOffset]  >> 2) & 0x07)
+        secondFloorReadonly.checked = (map[tileOffset + MAP_WIDTH + MAP_WIDTH] & 0x03)
+        firstByteReadonly.value = map[tileOffset].toString(2).padStart(8, 0)
+        secondByteReadonly.value = map[tileOffset + MAP_WIDTH].toString(2).padStart(8, 0)
+        thirdByteReadonly.value = map[tileOffset + MAP_WIDTH + MAP_WIDTH].toString(2).padStart(8, 0)
+
+        if (e.pressure === 0) {
+          return
+        }
+
+        mapX += e.movementX / mapZoom
+        mapY += e.movementY / mapZoom
+      }
+
+      function onWheel(e) {
+        if (e.deltaY < 0) {
+          mapZoom *= 1.1
+        } else {
+          mapZoom /= 1.1
+        }
+        if (mapZoom < mapMinZoom) {
+          mapZoom = mapMinZoom
+        } else if (mapZoom > mapMaxZoom) {
+          mapZoom = mapMaxZoom
+        }
+        zoomRange.value = mapZoom
+        zoomNumber.value = `${Math.floor(mapZoom * 100)}%`
+        needsRender = true
+      }
+
+      function loadMapByIndex(index) {
+        switch (index) {
+          case 0: return loadUnderground()
+          case 1: return loadGroundFloor()
+          case 2: return loadFirstFloor()
+          case 3: return loadGroundFloorDemo()
+          default: throw new Error('Invalid map index')
+        }
+      }
+
+      async function main() {
+        mapSelect.onchange = async (e) => {
+          const loadedMap = await loadMapByIndex(mapSelect.selectedIndex)
+          map.set(loadedMap, 0)
+          needsRender = true
+        }
+
+        wallsCheckbox.onchange = (e) => needsRender = true
+        typeCheckbox.onchange = (e) => needsRender = true
+        unknownCheckbox.onchange = (e) => needsRender = true
+        spritesCheckbox.onchange = (e) => needsRender = true
+        playerCheckbox.onchange = (e) => needsRender = true
+
+        zoomRange.onchange = (e) => {
+          mapZoom = zoomRange.valueAsNumber
+          zoomNumber.value = `${Math.floor(mapZoom * 100)}%`
+          needsRender = true
+        }
+
+        const groundFloor = await loadGroundFloor()
+        map.set(groundFloor, 0)
+
+        window.addEventListener('pointermove', onPointerMove)
+
+        window.addEventListener('keyup', onKey)
+        window.addEventListener('keydown', onKey)
+
+        window.addEventListener('wheel', onWheel)
+
+        window.requestAnimationFrame(onFrame)
+      }
+
+      main()
+    </script>
+  </body>
+</html>

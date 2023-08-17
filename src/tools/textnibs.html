@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Legends of Valour - Textnibs</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville&display=swap" rel="stylesheet">
+    <style>
+      html,
+      body {
+        background-color: #000;
+        color: #fff;
+        font-family: 'Libre Baskerville', serif;
+        display: grid;
+        place-items: center;
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+      }
+
+      canvas,
+      img {
+        width: calc(47px * 4);
+        height: calc(12px * 4);
+        image-rendering: pixelated;
+      }
+
+      .group {
+        display: flex;
+        flex-direction: column;
+      }
+
+      .container {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        gap: 1rem;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>TEXTNIBS.DAT</h1>
+      <div class="group">
+        <picture>
+          <img src="wizard.png" />
+          <figcaption>Original</figcaption>
+        </picture>
+      </div>
+      <div class="group">
+        <picture>
+          <canvas width="47" height="12"></canvas>
+          <figcaption>Generado</figcaption>
+        </picture>
+      </div>
+      <div class="group">
+        <label for="text">Texto</label>
+        <input id="text" type="text" value="Wizard" />
+      </div>
+    </div>
+    <script type="module">
+      async function loadTextnibs() {
+        const response = await fetch("TEXTNIBS.DAT");
+        const arrayBuffer = await response.arrayBuffer();
+        return new Uint8Array(arrayBuffer);
+      }
+
+      async function loadColors() {
+        const response = await fetch("PALETTES.DAT");
+        const arrayBuffer = await response.arrayBuffer();
+        const uint8 = new Uint8Array(arrayBuffer);
+
+        const colors = [];
+        for (let i = 0; i < uint8.length; i += 3) {
+          const r = uint8[i + 0];
+          const g = uint8[i + 1];
+          const b = uint8[i + 2];
+          colors.push(
+            `#${(r * 4).toString(16).padStart(2, 0)}${(g * 4)
+              .toString(16)
+              .padStart(2, 0)}${(b * 4).toString(16).padStart(2, 0)}`
+          );
+        }
+        return colors;
+      }
+
+      const text = document.querySelector("input[type=text]");
+      const canvas = document.querySelector("canvas");
+      const context = canvas.getContext("2d");
+
+      const textnibs = await loadTextnibs();
+      const bytesPerChar = 32;
+      const colors = await loadColors();
+      const height = 8;
+      // Ancho de las letras.
+      const widths = [
+        4, 4, 5, 7, 6, 7, 7, 4, 4, 4, 8, 6, 3, 6, 2, 7, 7, 6, 7, 7, 7, 7, 7, 7,
+        7, 7, 2, 3, 7, 6, 4, 6, 7, 7, 7, 7, 7, 7, 7, 7, 7, 4, 7, 7, 6, 8, 7, 7,
+        7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 4, 7, 4, 7, 8, 3, 7, 7, 7, 7, 7, 7, 7,
+        7, 3, 7, 7, 6, 8, 7, 7, 7, 8, 7, 7, 7, 7, 7, 8, 7, 7, 7, 7, 5, 7, 7, 0,
+        3, 7, 7, 7, 7, 7, 0, 7, 7, 7, 7, 0, 4, 0, 0, 4, 7, 7, 8, 7, 7, 7, 7, 0,
+      ];
+
+      function printCharacter(charCode, charx, chary) {
+        const index = charCode - 32;
+
+        let cx = charx;
+
+        for (let y = 0; y < height; y++) {
+          // ÑAAAAAARGH!
+          let offset = index * bytesPerChar + y * 4;
+
+          const cy = chary + y;
+
+          let width = widths[index];
+          while (width > 0) {
+            const current = textnibs[offset];
+            const firstNibble = (current & 0xf0) >> 4;
+            if (firstNibble !== 0) {
+              context.fillStyle = colors[firstNibble];
+              context.fillRect(cx, cy, 1, 1);
+            }
+
+            cx++;
+            width--;
+
+            if (width > 0) {
+              const secondNibble = current & 0x0f;
+              if (secondNibble !== 0) {
+                context.fillStyle = colors[secondNibble];
+                context.fillRect(cx, cy, 1, 1);
+              }
+
+              cx++;
+              width--;
+            }
+
+            offset++;
+          }
+
+          cx = charx;
+        }
+      }
+
+      function printString(str, x, y) {
+        let charx = x;
+        let chary = y;
+        for (let index = 0; index < str.length; index++) {
+          const charCode = str.charCodeAt(index);
+          const charIndex = charCode - 32;
+          const width = widths[charIndex];
+          printCharacter(charCode, charx, chary);
+          charx += width + 1;
+        }
+      }
+
+      function printText() {
+        context.fillStyle = "#000";
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        printString(text.value, 2, 2);
+      }
+
+      function onUpdate(e) {
+        printText()
+      }
+      printText()
+      text.oninput = onUpdate
+      text.onchange = onUpdate
+    </script>
+  </body>
+</html>

@@ -1,0 +1,25 @@
+{
+  "name": "lov-disasm",
+  "version": "1.0.0",
+  "description": "Legends of Valour (disassembled)",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "dev": "serve src",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "Legends",
+    "Valour",
+    "LOV",
+    "retro",
+    "reverse",
+    "engineering",
+    "reveng"
+  ],
+  "author": "AzazelN28 <azazeln28@gmail.com>",
+  "license": "MIT",
+  "dependencies": {
+    "serve": "^14.2.0"
+  }
+}
