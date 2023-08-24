@@ -1,25 +1,25 @@
 # Legends of Valour (Disassembled)
 
-[Legends of Valour](https://es.wikipedia.org/wiki/Legends_of_Valour) es el primer videojuego de rol al que jugué. El juego salió en 1992 (yo tenía 7 años) y me flipó muchísimo: las 3D, lo grande que parecía la ciudad, el ciclo de dia y noche, los ciudadanos, las catacumbas... parecía un mundo vivo. Es un juego que recuerdo con mucho cariño y en 2017 me dió por intentar hacer una especie de ["remake"](https://github.com/AzazelN28/lov) web que se puede probar [aquí](https://azazeln28.com/games/lov/).
+[Legends of Valour](https://es.wikipedia.org/wiki/Legends_of_Valour) is the first role-playing video game I played. The game was released in 1992 (I was 7 years old) and I was blown away by it: the 3D graphics, how big the city seemed, the day and night cycle, the citizens, the catacombs... it felt like a living world. It's a game that I remember fondly and in 2017 I decided to try and make a kind of web "[remake](https://github.com/AzazelN28/lov)" of it, which can be played [here](https://azazeln28.com/games/lov/).
 
 ![Legends of Valour (PC)](images/run_003.png)
 
-## Gráficos
+## Graphics
 
-Extraer los recursos fue relativamente sencillo, todos los archivos `.FCB` y `.FAB` son en realidad archivos `.LBM`, es decir, archivos de [Deluxe Paint](https://es.wikipedia.org/wiki/Deluxe_Paint). Desde Linux es súper fácil extraer todos los recursos usando el programa `ilbmtoppm`. Las animaciones de entrada son archivos `.FLI` que se pueden abrir con muchos reproductores actuales.
+Extracting the resources was relatively simple, all the `.FCB` and `.FAB` files are actually `.LBM` files, that is, [Deluxe Paint](https://en.wikipedia.org/wiki/Deluxe_Paint) files. From Linux it is super easy to extract all the resources using the `ilbmtoppm` program. The intro animations are `.FLI` files that can be opened with many current players.
 
-## Paletas
+## Palettes
 
-Las paletas se encuentran en los archivos `.FCB` y también en el archivo `PALETTES.DAT`. Este archivo `PALETTES.DAT` posee 736 colores diferentes para simular las diferentes horas del día y la noche.
+The palettes are found in the `.FCB` files and also in the `PALETTES.DAT` file. This `PALETTES.DAT` file has 736 different colors to simulate the different times of day and night.
 
-## Texto
+## Text
 
-La fuente se encuentra en el archivo `TEXTNIBS.DAT`, contiene 120 caracteres y se pueden pintar los caracteres de la siguiente forma:
+The font is located in the `TEXTNIBS.DAT` file, it contains 120 characters and the characters can be painted as follows:
 
 ```c
 #define TEXTNIBS 3840
 
-// Necesitarás cargar el archivo TEXTNIBS.DAT completo en memoria.
+// You'll need to load the TEXTNIBS file completely in memory
 uint8_t textnibs[TEXTNIBS];
 
 void print_character(uint8_t *textnibs, uint8_t char_code, uint32_t charx, uint32_t chary) {
@@ -60,7 +60,7 @@ void print_character(uint8_t *textnibs, uint8_t char_code, uint32_t charx, uint3
 }
 ```
 
-Los anchos de cada caracter está codificado directamente en el código del juego, el alto es 8 píxeles. Esta es la lista de anchos:
+The width of each character is directly encoded in the game's code, and the height is 8 pixels. Here's the list of widths:
 
 ```
 4, 4, 5, 7, 6, 7, 7, 4, 4, 4, 8, 6, 3, 6, 2, 7, 7, 6, 7, 7, 7, 7, 7, 7,
@@ -70,15 +70,14 @@ Los anchos de cada caracter está codificado directamente en el código del jueg
 3, 7, 7, 7, 7, 7, 0, 7, 7, 7, 7, 0, 4, 0, 0, 4, 7, 7, 8, 7, 7, 7, 7, 0,
 ```
 
-Cada pixel de la fuente se corresponde con un _nibble_, es decir, medio byte. De esta forma todos los caracteres de entre 3 y 8 pixeles de ancho por 8 de alto sólo ocupa 3.840 bytes.
+Each pixel of the font corresponds to a nibble, that is, half a byte. This way, all characters between 3 and 8 pixels wide by 8 pixels high only take up 3,840 bytes.
+## Map
 
-## Mapa
+The city map is divided into 3 different files of 32,768 bytes each. The `MAPG0009.DAT` file corresponds to the ground map (`MAPG0008.DAT` in the demo), the `MAPF0009.DAT` file corresponds to the first floor map, and the `MAPU0009.DAT` file corresponds to the catacombs.
 
-El mapa de la ciudad está dividido en 3 archivos diferentes de 32.768 bytes. El archivo `MAPG0009.DAT` corresponde al mapa del suelo (`MAPG0008.DAT` en la demo), el archivo `MAPF0009.DAT` corresponde al mapa de la primera planta y el archivo `MAPU0009.DAT` corresponde a las catacumbas.
+The size of the map is 85x128 squares. To represent each square, 3 bytes are needed: the first byte indicates the type of square, whether it has sprites, etc.; the second byte indicates the texture; and the third byte indicates whether there is a second floor.
 
-El tamaño del mapa es de 85x128 casillas, para representar cada casilla hacen falta 3 bytes, el primer byte indica el tipo de casilla, si la casilla tiene sprites, etc. el segundo byte indica la textura y el tercer byte indica si hay una segunda planta.
-
-La disposición de las casillas es así, donde F se corresponde con los primeros bytes de una casilla, la S con los segundos bytes de una casilla y la T con los terceros bytes de una casilla, el P es un padding que se introduce para que en vez de 255 (85 * 3), el ancho de cada fila sea 256 bytes:
+The arrangement of the squares is as follows, where F corresponds to the first byte of a square, S to the second byte, T to the third byte, and P is padding introduced so that the width of each row is 256 bytes instead of 255 (85 * 3):
 
 ```
 0 1 2 . . . . . . . . . . . . . . . . . . 255 256
@@ -91,48 +90,48 @@ F F F F F F F F S S S S S S S S T T T T T T T T P .
 F F F F F F F F S S S S S S S S T T T T T T T T P 128
 ```
 
-Los primeros bytes codifican varias propiedades en bits:
+The first bytes encode several properties in bits:
 
-| bits | descripción          |
+| bits | description          |
 |------|----------------------|
-| 0-1  | tipo de casilla      |
-| 2-4  | tipo de sprite       |
-| 5    | pared norte          |
-| 6    | pared oeste          |
-| 7    | desconocido          |
+| 0-1  | type of square      |
+| 2-4  | type of sprite       |
+| 5    | north wall          |
+| 6    | west wall          |
+| 7    | unknown          |
 
-| tipo de casilla | descripción         |
+| type of square | description         |
 |-----------------|---------------------|
 | 0               | interior            |
 | 1               | exterior            |
-| 2               | no transitable      |
+| 2               | not passable      |
 
-| tipo de sprite  | descripción         |
+| type of sprite  | description         |
 |-----------------|---------------------|
-| 0               | sin sprite          |
-| 1               | lámpara             |
-| 2               | árbol               |
-| 3               | columna             |
-| 4               | mesa                |
-| 5               | huevo de dragón     |
-| 6               | menir               |
-| 7               | vasija              |
+| 0               | no sprite          |
+| 1               | lamp             |
+| 2               | tree               |
+| 3               | column             |
+| 4               | table                |
+| 5               | dragon egg     |
+| 6               | menhir               |
+| 7               | vase              |
 
-## Código
+## Code
 
-El juego está dividido en tres programas diferentes donde `LOV.BAT` funciona como pegamento para unirlos: `TITLE.EXE` que reproduce la introducción, `CHARDES.EXE` es un diseñador de caracteres y `RUN.EXE` es el juego en sí. Está hecho así porque no utiliza modo protegido, esto implica que el límite de memoria de los programas es de 640 KB. Esto tiene una ventaja y es que desensamblar el código es bastante sencillo y se pueden entender muchas de las decisiones tomadas en el diseño del juego. Sin embargo, lo que más me facilitó el desensamblado es que al final de `RUN.EXE` se encuentra la tabla de símbolos exportada por Turbo Assembler 2. No es el primer juego de la época que me encuentro compilado en "modo debug" o con algún tipo de información de debug, supongo que las prisas y el _crunch_ obligaban a entregar la versión _gold_ en el último momento, en el estado que estuviera.
+The game is divided into three different programs where `LOV.BAT` acts as glue to join them: `TITLE.EXE` which plays the introduction, `CHARDES.EXE` is a character designer and `RUN.EXE` is the game itself. It is done this way because it does not use protected mode, which means that the memory limit of the programs is 640 KB. This has an advantage and that is that disassembling the code is quite simple and many of the decisions made in the design of the game can be understood. However, what made disassembly easier for me was that at the end of `RUN.EXE` is the symbol table exported by Turbo Assembler 2. It is not the first game of the time that I find compiled in "debug mode" or with some kind of debug information, I suppose that the rush and the crunch forced to deliver the "gold" version at the last moment, in the state it was in.
 
-La tabla de símbolos la tienes en [SYMBOLS.TXT](src/game/SYMBOLS.TXT) y para extraerla he utilizado _Turbo Debugger 2.0_.
+You can find the symbol table in [SYMBOLS.TXT](src/game/SYMBOLS.TXT) and to extract it I used _Turbo Debugger 2.0_.
 
 ![Turbo Debugger](images/run_000.png)
 
-Y para decompilar el juego he utilizado _The Interactive DisAssembler 3.7_, una versión antigua del famoso [IDA](https://hex-rays.com/ida-free/).
+And to decompile the game I used _The Interactive DisAssembler 3.7_, an old version of the famous [IDA](https://hex-rays.com/ida-free/).
 
 ![IDA3.7](images/ida_000.png)
 
-El juego no utiliza lenguajes de _scripting_, ni intérpretes, así que todas las misiones (_tasks_) están _hardcodeadas_ en el código del juego. Así como los textos (que se encuentran en el último segmento `seg003`) y muchas de las constantes del juego.
+The game does not use scripting languages or interpreters, so all the missions (tasks) are hardcoded in the game's code. As well as the texts (which are found in the last segment `seg003`) and many of the game's constants.
 
-### Datos curiosos
+### Curiosities
 
 TODO
 
